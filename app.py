@@ -4,19 +4,26 @@ import pandas as pd
 def fuzzy_match_items(df1, df2, column, length=3):
     matched_items = []
 
-    for i, val1 in enumerate(df1[column]):
-        for j, val2 in enumerate(df2[column]):
-            if isinstance(val1, str) and isinstance(val2, str):
-                overlap = sorted(set(val1) & set(val2))
-                if len(overlap) >= length:
-                    matched_items.append({
-                        f"df1_{column}": val1,
-                        f"df2_{column}": val2,
-                        "相同字元數": len(overlap),
-                        "共同字元": "".join(overlap)
-                    })
+    def has_common_substring(a, b, length):
+        a, b = str(a), str(b)
+        for i in range(len(a) - length + 1):
+            substring = a[i:i+length]
+            if substring in b:
+                return substring
+        return None
+
+    for val1 in df1[column].astype(str):
+        for val2 in df2[column].astype(str):
+            match = has_common_substring(val1, val2, length)
+            if match:
+                matched_items.append({
+                    f"df1_{column}": val1,
+                    f"df2_{column}": val2,
+                    "連續相同片段": match
+                })
 
     return pd.DataFrame(matched_items)
+
 
 # Streamlit App
 st.set_page_config(page_title="模糊比對工具", layout="wide")
