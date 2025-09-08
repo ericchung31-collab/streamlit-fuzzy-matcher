@@ -7,7 +7,7 @@ def fuzzy_match_items(df1, df2, column, length=3):
     for i, val1 in enumerate(df1[column]):
         for j, val2 in enumerate(df2[column]):
             if isinstance(val1, str) and isinstance(val2, str):
-                overlap = set(val1) & set(val2)
+                overlap = sorted(set(val1) & set(val2))
                 if len(overlap) >= length:
                     matched_items.append({
                         f"df1_{column}": val1,
