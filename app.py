@@ -1,60 +1,61 @@
 import streamlit as st
 import pandas as pd
 
-# --------------------
-# 模糊比對函數
-# --------------------
-def fuzzy_match_items(df1, df2, col1, col2, length=4):
-    matched_rows = []
+def fuzzy_match_items(df1, df2, column, length=3):
+    matched_items = []
 
-    for i, val1 in enumerate(df1[col1]):
-        for j, val2 in enumerate(df2[col2]):
+    for i, val1 in enumerate(df1[column]):
+        for j, val2 in enumerate(df2[column]):
             if isinstance(val1, str) and isinstance(val2, str):
-                common_chars = set(val1) & set(val2)
-                if len(common_chars) >= length:
-                    matched_rows.append({
-                        "df1_index": i,
-                        "df2_index": j,
-                        "df1_value": val1,
-                        "df2_value": val2,
-                        "相同字數": len(common_chars),
-                        "共同字元": ''.join(common_chars),
+                overlap = set(val1) & set(val2)
+                if len(overlap) >= length:
+                    matched_items.append({
+                        f"df1_{column}": val1,
+                        f"df2_{column}": val2,
+                        "相同字元數": len(overlap),
+                        "共同字元": "".join(overlap)
                     })
-    return pd.DataFrame(matched_rows)
 
-# --------------------
-# Streamlit 主介面
-# --------------------
-st.title("🔍 商品名稱模糊比對工具")
-st.markdown("上傳兩份 Excel 或 CSV 檔案，選擇要比對的欄位，即可找出 **有共同字元** 的品項（最少 X 個字相同）。")
+    return pd.DataFrame(matched_items)
 
-# 檔案上傳
-file1 = st.file_uploader("📁 上傳第一份資料", type=["xlsx", "csv"], key="file1")
-file2 = st.file_uploader("📁 上傳第二份資料", type=["xlsx", "csv"], key="file2")
+# Streamlit App
+st.set_page_config(page_title="模糊比對工具", layout="wide")
+st.title("🔍 兩份資料欄位模糊比對工具")
+
+file1 = st.file_uploader("上傳第一份 Excel 或 CSV 檔案", type=["xlsx", "csv"], key="file1")
+file2 = st.file_uploader("上傳第二份 Excel 或 CSV 檔案", type=["xlsx", "csv"], key="file2")
 
 if file1 and file2:
-    try:
-        # 自動偵測格式
-        df1 = pd.read_excel(file1, engine="openpyxl") if file1.name.endswith(".xlsx") else pd.read_csv(file1)
-        df2 = pd.read_excel(file2, engine="openpyxl") if file2.name.endswith(".xlsx") else pd.read_csv(file2)
+    def load_file(file):
+        if file.name.endswith(".xlsx"):
+            return pd.read_excel(file)
+        elif file.name.endswith(".csv"):
+            return pd.read_csv(file)
+        else:
+            return None
 
-        # 顯示欄位供選擇
-        st.subheader("🔧 選擇比對欄位")
-        column1 = st.selectbox("第一份資料欄位", df1.columns)
-        column2 = st.selectbox("第二份資料欄位", df2.columns)
+    df1 = load_file(file1)
+    df2 = load_file(file2)
 
-        # 最少共同字數
-        length = st.slider("✅ 最少共同字元數", min_value=1, max_value=10, value=4)
+    common_cols = list(set(df1.columns) & set(df2.columns))
+    if not common_cols:
+        st.error("❌ 兩份資料中沒有共同欄位，請確認資料格式一致")
+    else:
+        column = st.selectbox("選擇要比對的欄位", common_cols)
+        length = st.slider("設定比對成功所需的相同字元數", 1, 10, 3)
 
-        # 執行比對
-        if st.button("🚀 開始比對"):
-            result = fuzzy_match_items(df1, df2, column1, column2, length)
-            st.success(f"✅ 找到 {len(result)} 筆可能重複的品項")
+        if st.button("開始比對"):
+            with st.spinner("比對中，請稍候..."):
+                result = fuzzy_match_items(df1, df2, column, length=length)
+
+            st.success(f"✅ 比對完成，共有 {len(result)} 筆相似品項")
             st.dataframe(result)
 
-            # 下載結果
+            # 提供下載
             csv = result.to_csv(index=False).encode("utf-8-sig")
-            st.download_button("⬇️ 下載結果 CSV", data=csv, file_name="fuzzy_match_result.csv", mime="text/csv")
-
-    except Exception as e:
-        st.error(f"❌ 發生錯誤：{e}")
+            st.download_button(
+                label="📥 下載比對結果（CSV）",
+                data=csv,
+                file_name="fuzzy_match_result.csv",
+                mime="text/csv"
+            )
